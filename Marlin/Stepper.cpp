@@ -1,5 +1,22 @@
 #include "Stepper.h"
 
+/*         __________________________
+ *        /|                        |\     _________________         ^
+ *       / |                        | \   /|               |\        |
+ *      /  |                        |  \ / |               | \       s
+ *     /   |                        |   |  |               |  \      p
+ *    /    |                        |   |  |               |   \     e
+ *   +-----+------------------------+---+--+---------------+----+    e
+ *   |               BLOCK 1            |      BLOCK 2          |    d
+ *
+ *                           time ----->
+ *
+ *  The trapezoid is the shape the speed curve over time. It starts at block->initial_rate, accelerates
+ *  first block->accelerate_until step_events_completed, then keeps going at constant speed until
+ *  step_events_completed reaches block->decelerate_after after which it decelerates until the trapezoid generator is reset.
+ *  The slope of acceleration is calculated with the leib ramp alghorithm. */
+
+
 // "The Stepper Driver Interrupt" - This timer interrupt is the workhorse.
 // It pops blocks from the block_buffer and executes them by pulsing the stepper pins appropriately.
 ISR(Stepper::TIMER1_COMPA_vect)
@@ -209,35 +226,27 @@ ISR(Stepper::TIMER1_COMPA_vect)
           if(stepEventsCompleted >= currentBlock->step_event_count) break;
       }
 
-      // Calculare new timer value
-      unsigned short timer;
-      unsigned short step_rate;
+      // Calculate new timer value
+      uint16_t timer;
+      uint16_t step_rate;
+      /* Acceleration from currentBlock->initialRate to  currentBlock->nominalRate */
       if (stepEventsCompleted <= (unsigned long int)currentBlock->accelerate_until) {
-
-          MultiU24X24toH16(acc_step_rate, acceleration_time, currentBlock->acceleration_rate);
-          acc_step_rate += currentBlock->initial_rate;
+          /* calculate step-rate for this iteration */
+          step_rate = acceleration_time * currentBlock->acceleration_rate + currentBlock->initial_rate;
 
           // upper limit
-          if(acc_step_rate > currentBlock->nominal_rate)
-            acc_step_rate = currentBlock->nominal_rate;
+          if(step_rate > currentBlock->nominal_rate)
+            step_rate = currentBlock->nominal_rate;
 
           // step_rate to timer interval
-          timer = calcTimer(acc_step_rate);
+          timer = calcTimer(step_rate);
           OCR1A = timer;
           acceleration_time += timer;
-#ifdef ADVANCE
-          for(int8_t i=0; i < step_loops; i++) {
-              advance += advance_rate;
-          }
-          //if(advance > currentBlock->advance) advance = currentBlock->advance;
-          // Do E steps + advance steps
-          e_steps[currentBlock->active_extruder] += ((advance >>8) - old_advance);
-          old_advance = advance >>8;
-
-#endif
       }
       else if (stepEventsCompleted > (unsigned long int)currentBlock->decelerate_after) {
           MultiU24X24toH16(step_rate, deceleration_time, currentBlock->acceleration_rate);
+          acc_step_rate = deceleration_time * currentBlock->acceleration_rate + currentBlock->initial_rate;
+
 
           if(step_rate > acc_step_rate) { // Check step_rate stays positive
               step_rate = currentBlock->final_rate;
@@ -254,15 +263,6 @@ ISR(Stepper::TIMER1_COMPA_vect)
           timer = calc_timer(step_rate);
           OCR1A = timer;
           deceleration_time += timer;
-#ifdef ADVANCE
-          for(int8_t i=0; i < step_loops; i++) {
-              advance -= advance_rate;
-          }
-          if(advance < final_advance) advance = final_advance;
-          // Do E steps + advance steps
-          e_steps[currentBlock->active_extruder] += ((advance >>8) - old_advance);
-          old_advance = advance >>8;
-#endif //ADVANCE
       }
       else {
           OCR1A = OCR1A_nominal;
@@ -286,4 +286,5 @@ void Stepper::trapezoidGeneratorReset(void)
 uint16_t Stepper::calcTimer(uint16_t stepRate)
 {
   stepLoops = 1;
+  return 0;
 }

@@ -46,6 +46,8 @@ private:
   Kinematics_AxisCoordinates_t position = {0, 0, 0, 0}; /*!< Current position of the stepper. Incremented/Decremented in TIMER1_COMPA_vect or updated after end-stop/probing move */
   static Stepper_EndstopStatus_t endstopStatus = 0;     /*!< Status of min/max end-stops */
   static Kinematics_AxisCoordinates_t endstopTriggerPosition = {0, 0, 0, 0}; /*!< Position at which end-stops got triggered. Only used for reporting */
+  static uint32_t acceleration_time = 0;
+  static uint32_t deceleration_time = 0;
 
   static uint16_t calcTimer(uint16_t stepRate);
 };

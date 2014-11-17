@@ -29,6 +29,7 @@
 /* Testfunctions */
 #define WRITE(a,b)
 #define READ(a) 1
+#define MSerial.checkRx()
 
 extern uint16_t OCR1A;
 
